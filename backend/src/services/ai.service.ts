@@ -183,3 +183,140 @@ ${JSON.stringify(rows, null, 2)}`;
 
   throw new Error("Failed to process batch with AI after retries.");
 }
+
+/**
+ * Generate mock leads procedural fallback
+ */
+function generateMockLeads(count: number, industry: string, location: string): CRMLead[] {
+  const currentISO = new Date().toISOString();
+  
+  const names = [
+    "Arjun Patel", "Aditya Sharma", "Vikram Malhotra", "Rahul Verma", "Karan Singhal",
+    "Pooja Hegde", "Ananya Sen", "Meera Iyer", "Deepak Rao", "Siddharth Nair",
+    "Rohan Deshmukh", "Sneha Kulkarni", "Amit Patil", "Neha Reddy", "Divya Pillai",
+    "Sarah Jenkins", "Michael Chang", "Emily Watson", "David Miller", "Jessica Taylor"
+  ];
+  
+  const companySuffix = ["Solutions", "Tech", "Ventures", "Enterprises", "Consulting", "Group", "Digital"];
+  const propertyTypes = ["Commercial Office Space", "Premium 3BHK Villa", "2BHK Smart Apartment", "Commercial Retail Plot", "Industrial Warehouse Space"];
+  const timelines = ["Immediate (1-3 months)", "Mid-term (6-12 months)", "Planning phase (12+ months)"];
+
+  const leads: CRMLead[] = [];
+  for (let i = 0; i < count; i++) {
+    const rawName = names[Math.floor(Math.random() * names.length)];
+    const name = `${rawName} (Mock #${Math.floor(Math.random() * 900 + 100)})`;
+    const firstName = rawName.split(" ")[0].toLowerCase();
+    const email = `${firstName}.${Math.floor(Math.random() * 900 + 100)}@groweasy-mock.ai`;
+    
+    // Generate clean 10 digit phone
+    const phone = "9" + Math.floor(100000000 + Math.random() * 900000000).toString();
+    
+    const company = firstName.charAt(0).toUpperCase() + firstName.slice(1) + " " + companySuffix[Math.floor(Math.random() * companySuffix.length)];
+    const city = location || "Bangalore";
+    const state = city === "Bangalore" ? "Karnataka" : (city === "Mumbai" ? "Maharashtra" : "Delhi NCR");
+    
+    const lead: CRMLead = {
+      created_at: currentISO,
+      name,
+      email,
+      country_code: "91",
+      mobile_without_country_code: phone,
+      company,
+      city,
+      state,
+      country: "India",
+      lead_owner: "AI Generator",
+      crm_status: "GOOD_LEAD_FOLLOW_UP",
+      crm_note: `Generated lead for industry: ${industry || "Real Estate"}. Location preference: ${city}. Budget: INR ${Math.floor(Math.random() * 150 + 50)} Lakhs.`,
+      data_source: "leads_on_demand",
+      possession_time: timelines[Math.floor(Math.random() * timelines.length)],
+      description: `Prospecting buyer interested in ${propertyTypes[Math.floor(Math.random() * propertyTypes.length)]} within ${city}.`
+    };
+    leads.push(lead);
+  }
+  return leads;
+}
+
+const generateResponseSchema: Schema = {
+  type: SchemaType.ARRAY,
+  description: "Array of generated CRM Lead records based on the target criteria.",
+  items: {
+    type: SchemaType.OBJECT,
+    properties: {
+      created_at: { type: SchemaType.STRING },
+      name: { type: SchemaType.STRING },
+      email: { type: SchemaType.STRING },
+      country_code: { type: SchemaType.STRING },
+      mobile_without_country_code: { type: SchemaType.STRING },
+      company: { type: SchemaType.STRING },
+      city: { type: SchemaType.STRING },
+      state: { type: SchemaType.STRING },
+      country: { type: SchemaType.STRING },
+      lead_owner: { type: SchemaType.STRING },
+      crm_status: { type: SchemaType.STRING },
+      crm_note: { type: SchemaType.STRING },
+      data_source: { type: SchemaType.STRING },
+      possession_time: { type: SchemaType.STRING },
+      description: { type: SchemaType.STRING }
+    },
+    required: [
+      "created_at", "name", "email", "country_code", "mobile_without_country_code",
+      "company", "city", "state", "country", "lead_owner", "crm_status",
+      "crm_note", "data_source", "possession_time", "description"
+    ]
+  }
+};
+
+/**
+ * Generate leads with Gemini based on prompt configuration
+ */
+export async function generateLeadsWithAI(
+  promptText: string,
+  count: number,
+  industry: string,
+  location: string
+): Promise<CRMLead[]> {
+  if (!GEMINI_API_KEY) {
+    console.log("No GEMINI_API_KEY configured; returning fallback procedural mock leads.");
+    return generateMockLeads(count, industry, location);
+  }
+
+  const modelForGeneration = genAI.getGenerativeModel({
+    model: GEMINI_MODEL,
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: generateResponseSchema,
+      temperature: 0.7,
+    }
+  });
+
+  const prompt = `You are a growth marketing and lead generation AI. Generate exactly ${count} realistic B2B or B2C customer leads for a business targeting:
+Target Audience: ${promptText}
+Industry/Sector: ${industry}
+Geographic Location: ${location}
+
+STRICT GENERATION RULES:
+1. Provide realistic but fictitious names, emails, and phone numbers.
+2. Set "data_source" to "leads_on_demand".
+3. Set "crm_status" to "GOOD_LEAD_FOLLOW_UP".
+4. Set "created_at" to the current ISO timestamp: ${new Date().toISOString()}.
+5. "country_code" should be a valid dial code like "91" (for India) or "1" (for US). Do not prepend "+".
+6. "mobile_without_country_code" should be a clean 10-digit number.
+7. Fill in other fields with realistic values: company, city, state, country, lead_owner (set to "AI Generator"), possession_time, and description.
+
+Return ONLY a JSON array matching the schema.`;
+
+  try {
+    const response = await modelForGeneration.generateContent(prompt);
+    const text = response.response.text();
+    if (!text) {
+      throw new Error("Empty response received from AI model.");
+    }
+    const parsed: CRMLead[] = JSON.parse(text);
+    return parsed;
+  } catch (error: any) {
+    console.error("AI Lead Generation failed, falling back to mock leads:", error.message || error);
+    return generateMockLeads(count, industry, location);
+  }
+}
+

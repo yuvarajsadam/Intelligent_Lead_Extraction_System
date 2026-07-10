@@ -4,6 +4,11 @@ import React, { useState, useEffect } from "react";
 import Sidebar from "./components/Sidebar";
 import CSVImporterModal from "./components/CSVImporterModal";
 import LeadTable from "./components/LeadTable";
+import GenerateLeads from "./components/GenerateLeads";
+import EngageLeads from "./components/EngageLeads";
+import AdAccounts from "./components/AdAccounts";
+import TeamMembers from "./components/TeamMembers";
+import TeleCalling from "./components/TeleCalling";
 import { Share2, Users, FileSpreadsheet, Percent, Plus, ShieldCheck, ArrowRight, BarChart3 } from "lucide-react";
 import { API_URL } from "./config";
 import { Lead } from "./types";
@@ -320,8 +325,40 @@ export default function Home() {
           />
         )}
 
+        {/* VIEW: GENERATE LEADS */}
+        {currentView === "generate" && (
+          <GenerateLeads onLeadsUpdated={fetchLeads} />
+        )}
+
+        {/* VIEW: ENGAGE LEADS */}
+        {currentView === "engage" && (
+          <EngageLeads leads={leads} />
+        )}
+
+        {/* VIEW: AD ACCOUNTS */}
+        {currentView === "ads" && (
+          <AdAccounts />
+        )}
+
+        {/* VIEW: TEAM MEMBERS */}
+        {currentView === "members" && (
+          <TeamMembers />
+        )}
+
+        {/* VIEW: TELE CALLING */}
+        {currentView === "calling" && (
+          <TeleCalling leads={leads} onLeadsUpdated={fetchLeads} />
+        )}
+
         {/* FALLBACK FOR OTHER VIEW SHIMS */}
-        {currentView !== "dashboard" && currentView !== "sources" && currentView !== "manage" && (
+        {currentView !== "dashboard" &&
+         currentView !== "sources" &&
+         currentView !== "manage" &&
+         currentView !== "generate" &&
+         currentView !== "engage" &&
+         currentView !== "ads" &&
+         currentView !== "members" &&
+         currentView !== "calling" && (
           <div className="shim-view animate-fade-in">
             <div className="card text-center">
               <h3>{currentView.toUpperCase()} feature is currently disabled</h3>
