@@ -9,6 +9,10 @@ node_modules/
 .env.*
 *.env
 !*.env.example
+backend/.env
+frontend/.env
+**/backend/.env
+**/frontend/.env
 
 # Next.js build output
 .next/
